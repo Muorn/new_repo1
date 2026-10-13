@@ -1,0 +1,18 @@
+{
+  "title": "Demo Short",
+  "narration_file": "narration.wav",
+  "subtitles_file": "subtitles.ass",
+  "output_file": "final.mp4",
+  "scenes": [
+    {
+      "source": "source/001.jpg",
+      "duration": 3.0,
+      "motion": "zoom_in"
+    },
+    {
+      "source": "source/002.jpg",
+      "duration": 3.0,
+      "motion": "pan_right"
+    }
+  ]
+}
