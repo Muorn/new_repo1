@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import math
 import shutil
 import subprocess
 import sys
@@ -39,15 +38,15 @@ def motion_filter(motion: str, duration: float, focus_x=0.5, focus_y=0.5) -> str
     y = focus_expr('y', focus_y)
 
     if motion == 'micro_zoom_in':
-        return fill + f",zoompan=z='min(zoom+0.0007,1.055)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(zoom+0.0010,1.08)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'micro_zoom_out':
-        return fill + f",zoompan=z='if(eq(on,1),1.055,max(zoom-0.0007,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='if(eq(on,1),1.08,max(zoom-0.0010,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'zoom_in':
-        return fill + f",zoompan=z='min(zoom+0.0018,1.13)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(zoom+0.0022,1.15)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'zoom_out':
-        return fill + f",zoompan=z='if(eq(on,1),1.13,max(zoom-0.0018,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='if(eq(on,1),1.15,max(zoom-0.0022,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'punch_in':
-        return fill + f",zoompan=z='min(1+on/{max(frames,1)}*0.18,1.18)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(1+on/{max(frames,1)}*0.20,1.20)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'pan_left':
         return large + ",crop=1080:1920:x='max(0,(iw-1080)*(1-t/{d}))':y='max(0,(ih-1920)*{fy})',fps={fps}".format(d=max(duration,.001), fy=focus_y, fps=FPS)
     if motion == 'pan_right':
@@ -57,7 +56,6 @@ def motion_filter(motion: str, duration: float, focus_x=0.5, focus_y=0.5) -> str
     if motion == 'pan_down':
         return large + ",crop=1080:1920:x='max(0,(iw-1080)*{fx})':y='min(ih-1920,(ih-1920)*(t/{d}))',fps={fps}".format(d=max(duration,.001), fx=focus_x, fps=FPS)
     if motion == 'shake':
-        # Intentionally subtle: roughly +/- 12 px for a brief impact feel.
         return large + ",crop=1080:1920:x='(iw-1080)/2+12*sin(55*t)':y='(ih-1920)/2+10*cos(47*t)',fps={fps}".format(fps=FPS)
     return fill + f",fps={FPS}"
 
@@ -67,32 +65,52 @@ def emphasis_filter(text: str, impact: bool) -> str:
         return ''
     safe = esc_drawtext(text.upper())
     fontsize = 64 if len(text) <= 18 else 52
-    # Top-safe callout keeps narration captions free at the lower third.
-    alpha = "if(lt(t,0.12),t/0.12,if(lt(t,0.9),1,if(lt(t,1.15),(1.15-t)/0.25,0)))"
-    box = "box=1:boxcolor=black@0.58:boxborderw=22"
+    alpha = "if(lt(t,0.10),t/0.10,if(lt(t,0.85),1,if(lt(t,1.05),(1.05-t)/0.20,0)))"
+    box = "box=1:boxcolor=black@0.55:boxborderw=20"
     draw = (
         f"drawtext=fontfile='{FONT}':text='{safe}':fontsize={fontsize}:fontcolor=white:"
-        f"borderw=4:bordercolor=black@0.9:{box}:x=(w-text_w)/2:y=185:alpha='{alpha}'"
+        f"borderw=4:bordercolor=black@0.9:{box}:x=(w-text_w)/2:y=180:alpha='{alpha}'"
     )
     if impact:
         draw += ",eq=contrast=1.06:saturation=1.08"
     return ',' + draw
 
 
+def framed_filter(motion: str, duration: float, fx: float, fy: float, emphasis: str, impact: bool) -> str:
+    # Blurred full-frame duplicate + sharp contained panel, then camera motion on the composition.
+    pre = (
+        "split=2[bg][fg];"
+        "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28[bg2];"
+        "[fg]scale=980:1740:force_original_aspect_ratio=decrease[fg2];"
+        "[bg2][fg2]overlay=(W-w)/2:(H-h)/2[comp];"
+    )
+    chain = motion_filter(motion, duration, fx, fy) + emphasis_filter(emphasis, impact)
+    return pre + f"[comp]{chain}[v]"
+
+
 def render_scene(scene: dict, img: Path, out: Path):
-    duration = float(scene.get('duration', 2.2))
+    duration = float(scene.get('duration', 1.6))
     motion = scene.get('motion', 'micro_zoom_in')
+    layout = scene.get('layout', 'framed')
     fx = float(scene.get('focus_x', 0.5))
     fy = float(scene.get('focus_y', 0.5))
-    vf = motion_filter(motion, duration, fx, fy)
-    vf += emphasis_filter(scene.get('emphasis', ''), bool(scene.get('impact', False)))
-    run([
-        'ffmpeg', '-y', '-loop', '1', '-i', str(img),
-        '-t', f'{duration:.3f}', '-vf', vf,
+    emphasis = scene.get('emphasis', '')
+    impact = bool(scene.get('impact', False))
+
+    cmd = ['ffmpeg', '-y', '-loop', '1', '-i', str(img), '-t', f'{duration:.3f}']
+    if layout == 'framed':
+        fc = framed_filter(motion, duration, fx, fy, emphasis, impact)
+        cmd += ['-filter_complex', fc, '-map', '[v]']
+    else:
+        vf = motion_filter(motion, duration, fx, fy) + emphasis_filter(emphasis, impact)
+        cmd += ['-vf', vf]
+
+    cmd += [
         '-r', str(FPS), '-pix_fmt', 'yuv420p',
         '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19',
         '-an', str(out)
-    ])
+    ]
+    run(cmd)
 
 
 def main():
