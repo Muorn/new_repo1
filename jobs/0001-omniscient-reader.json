@@ -1,0 +1,41 @@
+{
+  "video_id": "0001-omniscient-reader",
+  "series": "Omniscient Reader",
+  "youtube_title": "He Was the ONLY Person Who Knew How the World Would End 😳 #shorts",
+  "description": "A quick English recommendation for Omniscient Reader, based on its official WEBTOON premise. Read the official series on WEBTOON. #manhwa #webtoon #omniscientreader #shorts",
+  "script": "Imagine finishing a web novel that almost nobody else cared about. Then one day, the story becomes real. Monsters appear. Society collapses. And every disaster happens exactly the way the novel predicted. That is Kim Dokja's nightmare. He was just an ordinary office worker, but suddenly he is the only person alive who knows what comes next. He knows the rules. He knows the disasters. He even knows the people who are supposed to survive. But knowing the future does not mean he can control it. And the moment he starts changing the story, the story starts changing him. This manhwa is Omniscient Reader.",
+  "assets": [
+    {
+      "id": "trailer-2020",
+      "url": "https://img.youtube.com/vi/8OHzcTtoLo4/maxresdefault.jpg",
+      "rights_basis": "official_promotional",
+      "source_url": "https://www.youtube.com/watch?v=8OHzcTtoLo4",
+      "source_note": "Official WEBTOON trailer thumbnail"
+    },
+    {
+      "id": "trailer-2024",
+      "url": "https://img.youtube.com/vi/8eLxBdv5ThE/maxresdefault.jpg",
+      "rights_basis": "official_promotional",
+      "source_url": "https://www.youtube.com/watch?v=8eLxBdv5ThE",
+      "source_note": "Official WEBTOON trailer thumbnail"
+    },
+    {
+      "id": "release-poster",
+      "url": "https://blog.kakaocdn.net/dna/bi3b4l/btqE7PE141L/AAAAAAAAAAAAAAAAAAAAANv4P0sS6cGLe51bIIUvKdV4xrpN4ZW1R_tZ4Mw61xKr/img.jpg?allow_ip=&allow_referer=&credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1774969199&signature=2i%2BGH6sCYWeB6kEOPOpzGhPpZDY%3D",
+      "rights_basis": "official_promotional",
+      "source_url": "https://ryuyuhyu.tistory.com/17",
+      "source_note": "Promotional release poster carrying WEBTOON branding"
+    }
+  ],
+  "scenes": [
+    {"asset_id": "trailer-2020", "duration": 4.2, "motion": "zoom_in", "caption": "IMAGINE FINISHING A WEB NOVEL..."},
+    {"asset_id": "release-poster", "duration": 4.1, "motion": "pan_right", "caption": "THEN THE STORY BECOMES REAL."},
+    {"asset_id": "trailer-2024", "duration": 4.1, "motion": "zoom_in", "caption": "MONSTERS. CHAOS. THE END OF THE WORLD."},
+    {"asset_id": "trailer-2020", "duration": 4.2, "motion": "pan_left", "caption": "AND ONLY ONE PERSON KNOWS WHAT COMES NEXT."},
+    {"asset_id": "release-poster", "duration": 4.0, "motion": "zoom_out", "caption": "KIM DOKJA KNOWS THE RULES."},
+    {"asset_id": "trailer-2024", "duration": 4.0, "motion": "pan_right", "caption": "HE KNOWS THE DISASTERS."},
+    {"asset_id": "trailer-2020", "duration": 4.0, "motion": "zoom_in", "caption": "HE EVEN KNOWS WHO SHOULD SURVIVE."},
+    {"asset_id": "release-poster", "duration": 4.4, "motion": "pan_left", "caption": "BUT CHANGING THE FUTURE CHANGES EVERYTHING."},
+    {"asset_id": "trailer-2024", "duration": 5.0, "motion": "zoom_in", "caption": "OMNISCIENT READER"}
+  ]
+}
