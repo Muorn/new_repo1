@@ -19,10 +19,9 @@ Style: Default,Arial,62,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,-1,0,0,0,100
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-MAX_WORDS_PER_CAPTION = 4
-MAX_CHARS_PER_LINE = 20
-MAX_LINES = 2
-HIGHLIGHT = "&H0000D7FF&"  # warm yellow in ASS BGR
+MAX_WORDS_PER_CAPTION = 2
+MAX_CHARS_PER_LINE = 18
+HIGHLIGHT = "&H0000D7FF&"
 
 
 def duration_seconds(audio: Path) -> float:
@@ -54,24 +53,16 @@ def chunks(text: str, max_words: int = MAX_WORDS_PER_CAPTION):
     return out
 
 
-def wrap_words(words):
-    if len(words) <= 2:
-        return ' '.join(words)
-    text = ' '.join(words)
-    if len(text) <= MAX_CHARS_PER_LINE:
-        return text
-    midpoint = max(1, len(words) // 2)
-    return ' '.join(words[:midpoint]) + r'\N' + ' '.join(words[midpoint:])
-
-
 def style_caption(text: str) -> str:
     cleaned = text.upper().replace('{', '(').replace('}', ')')
     words = cleaned.split()
     if not words:
         return ''
-    # Highlight the final content word in each burst; punctuation stays attached.
     words[-1] = r'{\c' + HIGHLIGHT + '}' + words[-1] + r'{\c&H00FFFFFF&}'
-    return wrap_words(words)
+    shown = ' '.join(words)
+    if len(shown) <= MAX_CHARS_PER_LINE:
+        return shown
+    return r'\N'.join(words)
 
 
 def main():
