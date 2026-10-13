@@ -13,15 +13,16 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,5,0,2,120,120,285,1
+Style: Default,Arial,62,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,5,0,2,130,130,300,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-MAX_WORDS_PER_CAPTION = 5
-MAX_CHARS_PER_LINE = 22
+MAX_WORDS_PER_CAPTION = 4
+MAX_CHARS_PER_LINE = 20
 MAX_LINES = 2
+HIGHLIGHT = "&H0000D7FF&"  # warm yellow in ASS BGR
 
 
 def duration_seconds(audio: Path) -> float:
@@ -53,28 +54,24 @@ def chunks(text: str, max_words: int = MAX_WORDS_PER_CAPTION):
     return out
 
 
-def wrap_caption(text: str) -> str:
-    words = text.split()
-    lines = []
-    current = []
+def wrap_words(words):
+    if len(words) <= 2:
+        return ' '.join(words)
+    text = ' '.join(words)
+    if len(text) <= MAX_CHARS_PER_LINE:
+        return text
+    midpoint = max(1, len(words) // 2)
+    return ' '.join(words[:midpoint]) + r'\N' + ' '.join(words[midpoint:])
 
-    for word in words:
-        candidate = ' '.join(current + [word])
-        if current and len(candidate) > MAX_CHARS_PER_LINE:
-            lines.append(' '.join(current))
-            current = [word]
-        else:
-            current.append(word)
 
-    if current:
-        lines.append(' '.join(current))
-
-    if len(lines) > MAX_LINES:
-        # Rebalance into at most two lines rather than letting ASS render off-screen.
-        midpoint = max(1, (len(words) + 1) // 2)
-        lines = [' '.join(words[:midpoint]), ' '.join(words[midpoint:])]
-
-    return r'\N'.join(lines[:MAX_LINES])
+def style_caption(text: str) -> str:
+    cleaned = text.upper().replace('{', '(').replace('}', ')')
+    words = cleaned.split()
+    if not words:
+        return ''
+    # Highlight the final content word in each burst; punctuation stays attached.
+    words[-1] = r'{\c' + HIGHLIGHT + '}' + words[-1] + r'{\c&H00FFFFFF&}'
+    return wrap_words(words)
 
 
 def main():
@@ -94,8 +91,7 @@ def main():
     for part, weight in zip(parts, weights):
         dur = unit * weight
         start, end = t, min(total, t + dur)
-        cleaned = part.upper().replace('{', '(').replace('}', ')')
-        shown = wrap_caption(cleaned)
+        shown = style_caption(part)
         lines.append(f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{shown}\n")
         t = end
     out_path.write_text(''.join(lines), encoding='utf-8')
