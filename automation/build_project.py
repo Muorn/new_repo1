@@ -27,7 +27,7 @@ def download(url: str, dest: Path):
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
         raise ValueError(f"Only HTTPS assets are permitted: {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": "GPT-Manhwa-Shorts/2.1", "Referer": "https://www.webtoons.com/"})
+    req = urllib.request.Request(url, headers={"User-Agent": "GPT-Manhwa-Shorts/3.0", "Referer": "https://www.webtoons.com/"})
     with urllib.request.urlopen(req, timeout=30) as r:
         length = int(r.headers.get("Content-Length") or 0)
         if length and length > MAX_ASSET_BYTES:
@@ -108,16 +108,16 @@ def main():
         motion = scene.get("motion", "micro_zoom_in")
         if motion not in ALLOWED_MOTIONS:
             raise SystemExit(f"Scene {i} rejected: unsupported motion {motion!r}")
-        layout = scene.get("layout", "framed")
+        layout = scene.get("layout", "fill")
         if layout not in ALLOWED_LAYOUTS:
             raise SystemExit(f"Scene {i} rejected: unsupported layout {layout!r}")
-        duration = float(scene.get("duration", 1.6))
+        duration = float(scene.get("duration", 2.2))
         if duration <= 0 or duration > 8:
             raise SystemExit(f"Scene {i} rejected: duration must be >0 and <=8s")
         fact = str(scene.get("fact", "")).strip()
         evidence_ref = str(scene.get("evidence_ref", "")).strip()
         if not fact or not evidence_ref:
-            raise SystemExit(f"Scene {i} must include fact and evidence_ref in V2")
+            raise SystemExit(f"Scene {i} must include fact and evidence_ref in V3")
 
         scenes.append({
             "source": asset_map[asset_id],
@@ -138,9 +138,9 @@ def main():
     total = sum(s["duration"] for s in scenes)
     avg = total / len(scenes)
     if total >= 30 and len(scenes) < 14:
-        raise SystemExit("V2 quality gate: >=30s videos require at least 14 visual beats")
-    if avg > 2.2:
-        raise SystemExit(f"V2 quality gate: average scene duration {avg:.2f}s exceeds 2.2s")
+        raise SystemExit("V3 quality gate: >=30s videos require at least 14 visual beats")
+    if avg > 2.7:
+        raise SystemExit(f"V3 quality gate: average authored scene duration {avg:.2f}s exceeds 2.7s")
 
     project_json = {
         "video_id": video_id,
@@ -150,7 +150,7 @@ def main():
         "narration_file": "narration.wav",
         "subtitles_file": "subtitles.ass",
         "output_file": "final.mp4",
-        "renderer_version": 2,
+        "renderer_version": 3,
         "scenes": scenes,
     }
     (project / "script.txt").write_text(job["script"].strip() + "\n", encoding="utf-8")
