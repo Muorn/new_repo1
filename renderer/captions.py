@@ -13,14 +13,16 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,62,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,5,0,2,130,130,300,1
+Style: Default,Arial,56,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,5,0,2,145,145,330,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-MAX_WORDS_PER_CAPTION = 2
-MAX_CHARS_PER_LINE = 18
+MIN_WORDS = 3
+TARGET_WORDS = 5
+MAX_WORDS = 6
+MAX_LINE_CHARS = 24
 HIGHLIGHT = "&H0000D7FF&"
 
 
@@ -40,17 +42,46 @@ def ass_time(sec: float) -> str:
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def chunks(text: str, max_words: int = MAX_WORDS_PER_CAPTION):
+def phrase_chunks(text: str):
     words = text.replace('\n', ' ').split()
     out, buf = [], []
     for w in words:
         buf.append(w)
-        if len(buf) >= max_words or re.search(r'[.!?]$', w):
+        terminal = bool(re.search(r'[.!?]$', w))
+        soft_break = bool(re.search(r'[,;:]$', w))
+        if terminal and len(buf) >= MIN_WORDS:
+            out.append(' '.join(buf))
+            buf = []
+        elif len(buf) >= MAX_WORDS:
+            out.append(' '.join(buf))
+            buf = []
+        elif soft_break and len(buf) >= TARGET_WORDS:
             out.append(' '.join(buf))
             buf = []
     if buf:
-        out.append(' '.join(buf))
+        if out and len(buf) < MIN_WORDS:
+            out[-1] += ' ' + ' '.join(buf)
+        else:
+            out.append(' '.join(buf))
     return out
+
+
+def split_lines(words):
+    text = ' '.join(words)
+    if len(text) <= MAX_LINE_CHARS:
+        return text
+    best = None
+    for i in range(1, len(words)):
+        left = ' '.join(words[:i])
+        right = ' '.join(words[i:])
+        score = max(len(left), len(right))
+        if len(left) <= MAX_LINE_CHARS and len(right) <= MAX_LINE_CHARS:
+            if best is None or score < best[0]:
+                best = (score, left, right)
+    if best:
+        return best[1] + r'\N' + best[2]
+    midpoint = max(1, len(words)//2)
+    return ' '.join(words[:midpoint]) + r'\N' + ' '.join(words[midpoint:])
 
 
 def style_caption(text: str) -> str:
@@ -58,11 +89,11 @@ def style_caption(text: str) -> str:
     words = cleaned.split()
     if not words:
         return ''
-    words[-1] = r'{\c' + HIGHLIGHT + '}' + words[-1] + r'{\c&H00FFFFFF&}'
-    shown = ' '.join(words)
-    if len(shown) <= MAX_CHARS_PER_LINE:
-        return shown
-    return r'\N'.join(words)
+    # Highlight one anchor word, not every two words.
+    candidates = [i for i,w in enumerate(words) if len(re.sub(r'\W','',w)) >= 5]
+    idx = candidates[-1] if candidates else len(words)-1
+    words[idx] = r'{\c' + HIGHLIGHT + '}' + words[idx] + r'{\c&H00FFFFFF&}'
+    return split_lines(words)
 
 
 def main():
@@ -71,7 +102,7 @@ def main():
     script_path, audio_path, out_path = map(Path, sys.argv[1:])
     text = script_path.read_text(encoding='utf-8').strip()
     total = duration_seconds(audio_path)
-    parts = chunks(text)
+    parts = phrase_chunks(text)
     if not parts:
         raise SystemExit('No caption text')
 
