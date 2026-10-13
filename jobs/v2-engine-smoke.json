@@ -1,0 +1,25 @@
+{
+  "video_id": "v2-engine-smoke",
+  "series": "Renderer Test",
+  "script": "This is the new evidence driven renderer. Every statement now maps to a visual beat. Camera motion follows the focal point. Short captions stay inside the safe area. Important facts can receive a clean callout. Impact moments can punch in or shake. This test exists only to validate the new engine.",
+  "assets": [
+    {"id":"a1","local_path":"test_assets/placeholder.ppm","rights_basis":"owned","source_label":"test"},
+    {"id":"a2","local_path":"test_assets/placeholder.ppm","rights_basis":"owned","source_label":"test"},
+    {"id":"a3","local_path":"test_assets/placeholder.ppm","rights_basis":"owned","source_label":"test"},
+    {"id":"a4","local_path":"test_assets/placeholder.ppm","rights_basis":"owned","source_label":"test"},
+    {"id":"a5","local_path":"test_assets/placeholder.ppm","rights_basis":"owned","source_label":"test"},
+    {"id":"a6","local_path":"test_assets/placeholder.ppm","rights_basis":"owned","source_label":"test"}
+  ],
+  "scenes": [
+    {"asset_id":"a1","duration":2.0,"motion":"micro_zoom_in","focus_x":0.5,"focus_y":0.4,"fact":"Renderer V2 exists","evidence_ref":"internal test","emphasis":"EVIDENCE FIRST"},
+    {"asset_id":"a2","duration":2.0,"motion":"pan_right","focus_x":0.5,"focus_y":0.5,"fact":"Facts map to beats","evidence_ref":"internal test"},
+    {"asset_id":"a3","duration":2.0,"motion":"zoom_in","focus_x":0.35,"focus_y":0.45,"fact":"Focus is controllable","evidence_ref":"internal test"},
+    {"asset_id":"a4","duration":2.0,"motion":"punch_in","focus_x":0.65,"focus_y":0.45,"fact":"Punch-in is supported","evidence_ref":"internal test","impact":true,"emphasis":"PUNCH IN"},
+    {"asset_id":"a5","duration":2.0,"motion":"pan_up","focus_x":0.5,"focus_y":0.5,"fact":"Vertical pans are supported","evidence_ref":"internal test"},
+    {"asset_id":"a6","duration":2.0,"motion":"pan_down","focus_x":0.5,"focus_y":0.5,"fact":"Downward pans are supported","evidence_ref":"internal test"},
+    {"asset_id":"a1","duration":2.0,"motion":"micro_zoom_out","focus_x":0.5,"focus_y":0.5,"fact":"Micro zoom out is supported","evidence_ref":"internal test"},
+    {"asset_id":"a2","duration":2.0,"motion":"shake","focus_x":0.5,"focus_y":0.5,"fact":"Impact shake is supported","evidence_ref":"internal test","impact":true},
+    {"asset_id":"a3","duration":2.0,"motion":"pan_left","focus_x":0.5,"focus_y":0.5,"fact":"Left pan is supported","evidence_ref":"internal test"},
+    {"asset_id":"a4","duration":2.0,"motion":"zoom_out","focus_x":0.5,"focus_y":0.5,"fact":"Zoom out is supported","evidence_ref":"internal test","emphasis":"V2 READY"}
+  ]
+}
