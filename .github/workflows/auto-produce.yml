@@ -1,0 +1,86 @@
+name: Auto Produce Short
+
+on:
+  push:
+    paths:
+      - 'jobs/*.json'
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  produce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect queued job
+        id: job
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE='${{ github.event.before }}'
+          SHA='${{ github.sha }}'
+          if [ "$BEFORE" = '0000000000000000000000000000000000000000' ]; then
+            JOB=$(git ls-tree -r --name-only "$SHA" | grep '^jobs/.*\.json$' | tail -n 1)
+          else
+            JOB=$(git diff --name-only "$BEFORE" "$SHA" | grep '^jobs/.*\.json$' | tail -n 1)
+          fi
+          test -n "$JOB"
+          echo "path=$JOB" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install FFmpeg and TTS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          python -m pip install kokoro-onnx soundfile
+
+      - name: Materialize project and approved assets
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROJECT=$(python automation/build_project.py '${{ steps.job.outputs.path }}' | tail -n 1)
+          echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+
+      - name: Generate narration
+        run: python renderer/tts.py '${{ steps.project.outputs.path }}/script.txt' '${{ steps.project.outputs.path }}/narration.wav'
+
+      - name: Generate captions
+        run: python renderer/captions.py '${{ steps.project.outputs.path }}/project.json' '${{ steps.project.outputs.path }}/script.txt' '${{ steps.project.outputs.path }}/narration.wav' '${{ steps.project.outputs.path }}/subtitles.ass'
+
+      - name: Render video
+        run: python renderer/render.py '${{ steps.project.outputs.path }}/project.json'
+
+      - name: Technical QA
+        run: python renderer/qa.py '${{ steps.project.outputs.path }}/output/final.mp4'
+
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.head_commit.id }}-rendered-short
+          path: ${{ steps.project.outputs.path }}/output/final.mp4
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Optional Google Drive upload
+        if: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON != '' }}
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_REVIEW_FOLDER_ID: '1FpLJUpjwQq91SYBwKGsVUx5dlIqpq8sl'
+        run: |
+          python -m pip install google-api-python-client google-auth
+          python renderer/upload_drive.py '${{ steps.project.outputs.path }}/output/final.mp4'
