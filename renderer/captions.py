@@ -8,16 +8,20 @@ ASS_HEADER = """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
-WrapStyle: 2
+WrapStyle: 0
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,74,&H00FFFFFF,&H000000FF,&H00000000,&H7A000000,-1,0,0,0,100,100,0,0,1,5,0,2,70,70,255,1
+Style: Default,Arial,64,&H00FFFFFF,&H000000FF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,5,0,2,120,120,285,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
+
+MAX_WORDS_PER_CAPTION = 5
+MAX_CHARS_PER_LINE = 22
+MAX_LINES = 2
 
 
 def duration_seconds(audio: Path) -> float:
@@ -36,7 +40,7 @@ def ass_time(sec: float) -> str:
     return f"{h}:{m:02d}:{s:05.2f}"
 
 
-def chunks(text: str, max_words: int = 6):
+def chunks(text: str, max_words: int = MAX_WORDS_PER_CAPTION):
     words = text.replace('\n', ' ').split()
     out, buf = [], []
     for w in words:
@@ -47,6 +51,30 @@ def chunks(text: str, max_words: int = 6):
     if buf:
         out.append(' '.join(buf))
     return out
+
+
+def wrap_caption(text: str) -> str:
+    words = text.split()
+    lines = []
+    current = []
+
+    for word in words:
+        candidate = ' '.join(current + [word])
+        if current and len(candidate) > MAX_CHARS_PER_LINE:
+            lines.append(' '.join(current))
+            current = [word]
+        else:
+            current.append(word)
+
+    if current:
+        lines.append(' '.join(current))
+
+    if len(lines) > MAX_LINES:
+        # Rebalance into at most two lines rather than letting ASS render off-screen.
+        midpoint = max(1, (len(words) + 1) // 2)
+        lines = [' '.join(words[:midpoint]), ' '.join(words[midpoint:])]
+
+    return r'\N'.join(lines[:MAX_LINES])
 
 
 def main():
@@ -66,7 +94,8 @@ def main():
     for part, weight in zip(parts, weights):
         dur = unit * weight
         start, end = t, min(total, t + dur)
-        shown = part.upper().replace('{', '(').replace('}', ')')
+        cleaned = part.upper().replace('{', '(').replace('}', ')')
+        shown = wrap_caption(cleaned)
         lines.append(f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{shown}\n")
         t = end
     out_path.write_text(''.join(lines), encoding='utf-8')
