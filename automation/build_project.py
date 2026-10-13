@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-ALLOWED_RIGHTS = {"owned", "licensed", "official_promotional", "creator_authorized", "open_license", "public_domain"}
+ALLOWED_RIGHTS = {"owned", "licensed", "official_promotional", "official_public_excerpt", "creator_authorized", "open_license", "public_domain"}
 ALLOWED_SCHEMES = {"https"}
 MAX_ASSET_BYTES = 20 * 1024 * 1024
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".ppm"}
@@ -15,6 +15,7 @@ ALLOWED_MOTIONS = {
     "static", "micro_zoom_in", "micro_zoom_out", "zoom_in", "zoom_out",
     "punch_in", "pan_left", "pan_right", "pan_up", "pan_down", "shake"
 }
+ALLOWED_LAYOUTS = {"fill", "framed"}
 
 
 def slugify(s: str) -> str:
@@ -26,7 +27,7 @@ def download(url: str, dest: Path):
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
         raise ValueError(f"Only HTTPS assets are permitted: {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": "GPT-Manhwa-Shorts/2.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "GPT-Manhwa-Shorts/2.1", "Referer": "https://www.webtoons.com/"})
     with urllib.request.urlopen(req, timeout=30) as r:
         length = int(r.headers.get("Content-Length") or 0)
         if length and length > MAX_ASSET_BYTES:
@@ -107,7 +108,10 @@ def main():
         motion = scene.get("motion", "micro_zoom_in")
         if motion not in ALLOWED_MOTIONS:
             raise SystemExit(f"Scene {i} rejected: unsupported motion {motion!r}")
-        duration = float(scene.get("duration", 2.2))
+        layout = scene.get("layout", "framed")
+        if layout not in ALLOWED_LAYOUTS:
+            raise SystemExit(f"Scene {i} rejected: unsupported layout {layout!r}")
+        duration = float(scene.get("duration", 1.6))
         if duration <= 0 or duration > 8:
             raise SystemExit(f"Scene {i} rejected: duration must be >0 and <=8s")
         fact = str(scene.get("fact", "")).strip()
@@ -120,6 +124,7 @@ def main():
             "asset_id": asset_id,
             "duration": duration,
             "motion": motion,
+            "layout": layout,
             "caption": scene.get("caption", ""),
             "fact": fact,
             "evidence_ref": evidence_ref,
@@ -132,10 +137,10 @@ def main():
 
     total = sum(s["duration"] for s in scenes)
     avg = total / len(scenes)
-    if total >= 30 and len(scenes) < 10:
-        raise SystemExit("V2 quality gate: >=30s videos require at least 10 visual beats")
-    if avg > 3.0:
-        raise SystemExit(f"V2 quality gate: average scene duration {avg:.2f}s exceeds 3.0s")
+    if total >= 30 and len(scenes) < 14:
+        raise SystemExit("V2 quality gate: >=30s videos require at least 14 visual beats")
+    if avg > 2.2:
+        raise SystemExit(f"V2 quality gate: average scene duration {avg:.2f}s exceeds 2.2s")
 
     project_json = {
         "video_id": video_id,
