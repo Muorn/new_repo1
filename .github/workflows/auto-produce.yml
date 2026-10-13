@@ -44,7 +44,7 @@ jobs:
       - name: Install FFmpeg and TTS dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
           python -m pip install --upgrade pip
           python -m pip install kokoro-onnx soundfile
 
@@ -55,6 +55,9 @@ jobs:
           set -euo pipefail
           PROJECT=$(python automation/build_project.py '${{ steps.job.outputs.path }}' | tail -n 1)
           echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+
+      - name: Evidence-driven creative QA
+        run: python renderer/creative_qa.py '${{ steps.project.outputs.path }}/project.json'
 
       - name: Generate narration
         run: python renderer/tts.py '${{ steps.project.outputs.path }}/script.txt' '${{ steps.project.outputs.path }}/narration.wav'
