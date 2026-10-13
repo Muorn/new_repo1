@@ -1,0 +1,63 @@
+name: Render Short
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_path:
+        description: Project folder, e.g. projects/demo
+        required: true
+        default: projects/demo
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install FFmpeg and Python packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          python -m pip install kokoro-onnx soundfile
+
+      - name: Generate narration when absent
+        shell: bash
+        run: |
+          PROJECT='${{ inputs.project_path }}'
+          if [ ! -f "$PROJECT/narration.wav" ]; then
+            python renderer/tts.py "$PROJECT/script.txt" "$PROJECT/narration.wav"
+          fi
+
+      - name: Render video
+        run: python renderer/render.py '${{ inputs.project_path }}/project.json'
+
+      - name: Technical QA
+        run: python renderer/qa.py '${{ inputs.project_path }}/output/final.mp4'
+
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-short
+          path: ${{ inputs.project_path }}/output/final.mp4
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Optional Google Drive upload
+        if: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON != '' }}
+        env:
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_REVIEW_FOLDER_ID: '1FpLJUpjwQq91SYBwKGsVUx5dlIqpq8sl'
+        run: |
+          python -m pip install google-api-python-client google-auth
+          python renderer/upload_drive.py '${{ inputs.project_path }}/output/final.mp4'
