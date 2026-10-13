@@ -1,0 +1,7 @@
+.models/
+**/.render/
+**/output/
+**/narration.wav
+**/subtitles.ass
+*.mp4
+*.wav
