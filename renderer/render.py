@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import math
 import shutil
 import subprocess
 import sys
@@ -21,14 +20,16 @@ def esc_filter_path(p: Path) -> str:
 def motion_filter(motion: str, duration: float) -> str:
     frames = max(1, int(round(duration * FPS)))
     base = "scale='if(gt(a,9/16),-2,1080)':'if(gt(a,9/16),1920,-2)',crop=1080:1920"
+    pan_base = "scale='if(gt(a,9/16),-2,1200)':'if(gt(a,9/16),2100,-2)'"
+
     if motion == 'zoom_in':
         return base + f",zoompan=z='min(zoom+0.0015,1.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'zoom_out':
         return base + f",zoompan=z='if(eq(on,1),1.12,max(zoom-0.0015,1.0))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'pan_left':
-        return "scale=-2:1920,crop=1080:1920:x='max(0,(iw-1080)*(1-t/{d}))':y='(ih-1920)/2'".format(d=max(duration, .001))
+        return pan_base + ",crop=1080:1920:x='max(0,(iw-1080)*(1-t/{d}))':y='max(0,(ih-1920)/2)',fps={fps}".format(d=max(duration, .001), fps=FPS)
     if motion == 'pan_right':
-        return "scale=-2:1920,crop=1080:1920:x='min(iw-1080,(iw-1080)*(t/{d}))':y='(ih-1920)/2'".format(d=max(duration, .001))
+        return pan_base + ",crop=1080:1920:x='min(iw-1080,(iw-1080)*(t/{d}))':y='max(0,(ih-1920)/2)',fps={fps}".format(d=max(duration, .001), fps=FPS)
     return base + f",fps={FPS}"
 
 
@@ -80,9 +81,7 @@ def main():
     subtitles = root / cfg.get('subtitles_file', 'subtitles.ass')
     final = outdir / cfg.get('output_file', 'final.mp4')
 
-    vf = None
-    if subtitles.exists():
-        vf = f"ass='{esc_filter_path(subtitles)}'"
+    vf = f"ass='{esc_filter_path(subtitles)}'" if subtitles.exists() else None
 
     cmd = ['ffmpeg', '-y', '-i', str(picture)]
     if narration.exists():
