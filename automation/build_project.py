@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 import json
 import re
+import shutil
 import sys
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-ALLOWED_RIGHTS = {"owned", "licensed", "official_promotional", "creator_authorized"}
+ALLOWED_RIGHTS = {"owned", "licensed", "official_promotional", "creator_authorized", "open_license", "public_domain"}
 ALLOWED_SCHEMES = {"https"}
 MAX_ASSET_BYTES = 20 * 1024 * 1024
+ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".ppm"}
 
 
 def slugify(s: str) -> str:
@@ -52,14 +54,31 @@ def main():
         rights = asset.get("rights_basis")
         if rights not in ALLOWED_RIGHTS:
             raise SystemExit(f"Asset {idx} rejected: invalid rights_basis={rights!r}")
+
         url = asset.get("url")
-        if not url:
-            raise SystemExit(f"Asset {idx} has no URL")
-        ext = Path(urlparse(url).path).suffix.lower()
-        if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
-            ext = ".jpg"
-        local = source / f"{idx:03d}{ext}"
-        download(url, local)
+        local_path = asset.get("local_path")
+        if bool(url) == bool(local_path):
+            raise SystemExit(f"Asset {idx} must provide exactly one of url or local_path")
+
+        if local_path:
+            src = Path(local_path).resolve()
+            repo = Path.cwd().resolve()
+            if repo not in src.parents and src != repo:
+                raise SystemExit(f"Asset {idx} local_path escapes repository")
+            if not src.exists():
+                raise SystemExit(f"Asset {idx} local_path not found: {local_path}")
+            ext = src.suffix.lower()
+            if ext not in ALLOWED_EXTS:
+                raise SystemExit(f"Asset {idx} extension not allowed: {ext}")
+            local = source / f"{idx:03d}{ext}"
+            shutil.copyfile(src, local)
+        else:
+            ext = Path(urlparse(url).path).suffix.lower()
+            if ext not in ALLOWED_EXTS:
+                ext = ".jpg"
+            local = source / f"{idx:03d}{ext}"
+            download(url, local)
+
         asset_map[asset.get("id", f"asset-{idx}")] = local.relative_to(project).as_posix()
 
     scenes = []
