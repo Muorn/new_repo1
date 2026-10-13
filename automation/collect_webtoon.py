@@ -14,7 +14,7 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import urlparse
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 ALLOWED_HOSTS = {"www.webtoons.com", "m.webtoons.com"}
 MAX_IMAGES = 20
@@ -44,7 +44,7 @@ def extract_image_urls(page_html: str):
             u = html.unescape(raw).replace('\\u0026', '&')
             if u.startswith('//'):
                 u = 'https:' + u
-            if u.startswith('https://') and ('webtoon-phinf.pstatic.net' in u or 'webtoon-phinf.pstatic.net' in urlparse(u).netloc):
+            if u.startswith('https://') and 'webtoon-phinf.pstatic.net' in urlparse(u).netloc:
                 candidates.append(u)
     out, seen = [], set()
     for u in candidates:
@@ -111,6 +111,7 @@ def main():
     indices = choose_indices(len(urls), count, start_frac, end_frac)
 
     files = []
+    selected = []
     for seq, idx in enumerate(indices, 1):
         u = urls[idx]
         ext = Path(urlparse(u).path).suffix.lower()
@@ -119,6 +120,12 @@ def main():
         p = outdir / f'{seq:02d}-panel-{idx+1:03d}{ext}'
         p.write_bytes(fetch(u, referer=episode_url))
         files.append(p)
+        selected.append({
+            'sequence': seq,
+            'episode_image_index_1_based': idx + 1,
+            'file': p.name,
+            'url': u,
+        })
 
     make_contact_sheet(files, outdir / 'contact-sheet.jpg')
     manifest = {
@@ -126,8 +133,7 @@ def main():
         'episode_url': episode_url,
         'discovered_image_count': len(urls),
         'sample_window': [start_frac, end_frac],
-        'selected_indices_1_based': [i + 1 for i in indices],
-        'files': [p.name for p in files],
+        'selected': selected,
         'notice': 'Public official WEBTOON excerpts collected for transformative review/editing. This does not grant a license; final use remains subject to copyright/platform rules.'
     }
     (outdir / 'source-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
