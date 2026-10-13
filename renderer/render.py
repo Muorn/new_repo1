@@ -14,6 +14,14 @@ def run(cmd):
     subprocess.run(cmd, check=True)
 
 
+def probe_duration(path: Path) -> float:
+    out = subprocess.check_output([
+        'ffprobe','-v','error','-show_entries','format=duration',
+        '-of','default=noprint_wrappers=1:nokey=1',str(path)
+    ], text=True).strip()
+    return float(out)
+
+
 def esc_filter_path(p: Path) -> str:
     return str(p).replace('\\', '/').replace(':', '\\:').replace("'", "\\'")
 
@@ -38,15 +46,15 @@ def motion_filter(motion: str, duration: float, focus_x=0.5, focus_y=0.5) -> str
     y = focus_expr('y', focus_y)
 
     if motion == 'micro_zoom_in':
-        return fill + f",zoompan=z='min(zoom+0.0010,1.08)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(zoom+0.0008,1.07)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'micro_zoom_out':
-        return fill + f",zoompan=z='if(eq(on,1),1.08,max(zoom-0.0010,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='if(eq(on,1),1.07,max(zoom-0.0008,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'zoom_in':
-        return fill + f",zoompan=z='min(zoom+0.0022,1.15)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(zoom+0.0016,1.13)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'zoom_out':
-        return fill + f",zoompan=z='if(eq(on,1),1.15,max(zoom-0.0022,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='if(eq(on,1),1.13,max(zoom-0.0016,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'punch_in':
-        return fill + f",zoompan=z='min(1+on/{max(frames,1)}*0.20,1.20)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(1+on/{max(frames,1)}*0.16,1.16)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'pan_left':
         return large + ",crop=1080:1920:x='max(0,(iw-1080)*(1-t/{d}))':y='max(0,(ih-1920)*{fy})',fps={fps}".format(d=max(duration,.001), fy=focus_y, fps=FPS)
     if motion == 'pan_right':
@@ -56,7 +64,7 @@ def motion_filter(motion: str, duration: float, focus_x=0.5, focus_y=0.5) -> str
     if motion == 'pan_down':
         return large + ",crop=1080:1920:x='max(0,(iw-1080)*{fx})':y='min(ih-1920,(ih-1920)*(t/{d}))',fps={fps}".format(d=max(duration,.001), fx=focus_x, fps=FPS)
     if motion == 'shake':
-        return large + ",crop=1080:1920:x='(iw-1080)/2+12*sin(55*t)':y='(ih-1920)/2+10*cos(47*t)',fps={fps}".format(fps=FPS)
+        return large + ",crop=1080:1920:x='(iw-1080)/2+10*sin(45*t)':y='(ih-1920)/2+8*cos(41*t)',fps={fps}".format(fps=FPS)
     return fill + f",fps={FPS}"
 
 
@@ -64,34 +72,32 @@ def emphasis_filter(text: str, impact: bool) -> str:
     if not text:
         return ''
     safe = esc_drawtext(text.upper())
-    fontsize = 64 if len(text) <= 18 else 52
-    alpha = "if(lt(t,0.10),t/0.10,if(lt(t,0.85),1,if(lt(t,1.05),(1.05-t)/0.20,0)))"
-    box = "box=1:boxcolor=black@0.55:boxborderw=20"
+    fontsize = 60 if len(text) <= 18 else 48
+    alpha = "if(lt(t,0.10),t/0.10,if(lt(t,1.0),1,if(lt(t,1.25),(1.25-t)/0.25,0)))"
+    box = "box=1:boxcolor=black@0.48:boxborderw=18"
     draw = (
         f"drawtext=fontfile='{FONT}':text='{safe}':fontsize={fontsize}:fontcolor=white:"
-        f"borderw=4:bordercolor=black@0.9:{box}:x=(w-text_w)/2:y=180:alpha='{alpha}'"
+        f"borderw=4:bordercolor=black@0.9:{box}:x=(w-text_w)/2:y=170:alpha='{alpha}'"
     )
     if impact:
-        draw += ",eq=contrast=1.06:saturation=1.08"
+        draw += ",eq=contrast=1.05:saturation=1.06"
     return ',' + draw
 
 
 def framed_filter(motion: str, duration: float, fx: float, fy: float, emphasis: str, impact: bool) -> str:
-    # Blurred full-frame duplicate + sharp contained panel, then camera motion on the composition.
     pre = (
         "split=2[bg][fg];"
-        "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28[bg2];"
-        "[fg]scale=980:1740:force_original_aspect_ratio=decrease[fg2];"
+        "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24[bg2];"
+        "[fg]scale=1040:1820:force_original_aspect_ratio=decrease[fg2];"
         "[bg2][fg2]overlay=(W-w)/2:(H-h)/2[comp];"
     )
     chain = motion_filter(motion, duration, fx, fy) + emphasis_filter(emphasis, impact)
     return pre + f"[comp]{chain}[v]"
 
 
-def render_scene(scene: dict, img: Path, out: Path):
-    duration = float(scene.get('duration', 1.6))
+def render_scene(scene: dict, img: Path, out: Path, duration: float):
     motion = scene.get('motion', 'micro_zoom_in')
-    layout = scene.get('layout', 'framed')
+    layout = scene.get('layout', 'fill')
     fx = float(scene.get('focus_x', 0.5))
     fy = float(scene.get('focus_y', 0.5))
     emphasis = scene.get('emphasis', '')
@@ -124,6 +130,19 @@ def main():
     if not scenes:
         raise SystemExit('project.json must contain at least one scene')
 
+    narration = root / cfg.get('narration_file', 'narration.wav')
+    narration_duration = probe_duration(narration) if narration.exists() else None
+    base_durations = [float(s.get('duration', 2.2)) for s in scenes]
+    base_total = sum(base_durations)
+
+    # Never allow the picture track to end before the narration. If narration is
+    # longer than the authored scene plan, slow the visual cadence proportionally.
+    scale = 1.0
+    if narration_duration and base_total < narration_duration + 0.35:
+        scale = (narration_duration + 0.35) / base_total
+    durations = [d * scale for d in base_durations]
+    print(f'visual timing scale={scale:.3f}; base={base_total:.2f}s; narration={narration_duration or 0:.2f}s')
+
     work = root / '.render'
     outdir = root / 'output'
     shutil.rmtree(work, ignore_errors=True)
@@ -131,12 +150,12 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
 
     clips = []
-    for i, scene in enumerate(scenes, start=1):
+    for i, (scene, duration) in enumerate(zip(scenes, durations), start=1):
         src = root / scene['source']
         if not src.exists():
             raise FileNotFoundError(src)
         clip = work / f'{i:03d}.mp4'
-        render_scene(scene, src, clip)
+        render_scene(scene, src, clip, duration)
         clips.append(clip)
 
     concat = work / 'concat.txt'
@@ -144,10 +163,8 @@ def main():
     picture = work / 'picture.mp4'
     run(['ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', str(concat), '-c', 'copy', str(picture)])
 
-    narration = root / cfg.get('narration_file', 'narration.wav')
     subtitles = root / cfg.get('subtitles_file', 'subtitles.ass')
     final = outdir / cfg.get('output_file', 'final.mp4')
-
     vf = f"ass='{esc_filter_path(subtitles)}'" if subtitles.exists() else None
 
     cmd = ['ffmpeg', '-y', '-i', str(picture)]
