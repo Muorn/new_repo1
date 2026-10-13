@@ -1,0 +1,24 @@
+{
+  "video_id": "2026-10-14-renderer-smoke-test",
+  "series": "Pipeline Test",
+  "source_page": "internal-test",
+  "angle": "Mechanical end-to-end renderer validation",
+  "youtube_title": "Pipeline Test",
+  "description": "Owned placeholder asset used only to validate the automated renderer.",
+  "script": "This is an automated production test. The system should generate the narration, create captions, animate the visual, render a vertical video, and verify the finished file without any manual editing.",
+  "assets": [
+    {
+      "id": "owned-placeholder",
+      "local_path": "test_assets/placeholder.ppm",
+      "rights_basis": "owned",
+      "source_url": "repository-owned-test-asset"
+    }
+  ],
+  "scenes": [
+    {"asset_id": "owned-placeholder", "duration": 3.0, "motion": "zoom_in", "caption": "AUTOMATED PRODUCTION TEST"},
+    {"asset_id": "owned-placeholder", "duration": 3.0, "motion": "zoom_out", "caption": "GPT DIRECTS"},
+    {"asset_id": "owned-placeholder", "duration": 3.0, "motion": "static", "caption": "FFMPEG RENDERS"},
+    {"asset_id": "owned-placeholder", "duration": 3.0, "motion": "zoom_in", "caption": "READY FOR REVIEW"}
+  ],
+  "review_status": "awaiting_render"
+}
