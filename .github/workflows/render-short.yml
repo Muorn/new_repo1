@@ -39,6 +39,14 @@ jobs:
             python renderer/tts.py "$PROJECT/script.txt" "$PROJECT/narration.wav"
           fi
 
+      - name: Generate captions when absent
+        shell: bash
+        run: |
+          PROJECT='${{ inputs.project_path }}'
+          if [ ! -f "$PROJECT/subtitles.ass" ]; then
+            python renderer/captions.py "$PROJECT/script.txt" "$PROJECT/narration.wav" "$PROJECT/subtitles.ass"
+          fi
+
       - name: Render video
         run: python renderer/render.py '${{ inputs.project_path }}/project.json'
 
