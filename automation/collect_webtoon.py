@@ -2,8 +2,8 @@
 """Collect a limited visual research pack from a public official WEBTOON episode.
 
 This is intentionally constrained: official webtoons.com episode URLs only, a bounded
-number of images, and a contact sheet for GPT review. The output is a research/source
-pack; it is not automatically published or treated as licensed material.
+number of episode-panel images, and a contact sheet for GPT review. The output is a
+research/source pack; it is not automatically published or treated as licensed material.
 """
 import html
 import json
@@ -23,7 +23,7 @@ MAX_FILE_BYTES = 8 * 1024 * 1024
 
 def fetch(url: str, referer: str | None = None) -> bytes:
     headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; GPT-Manhwa-Research/2.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; GPT-Manhwa-Research/2.1)",
         "Accept": "text/html,image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
     }
     if referer:
@@ -36,19 +36,42 @@ def fetch(url: str, referer: str | None = None) -> bytes:
     return data
 
 
+def normalize_url(raw: str):
+    u = html.unescape(raw).replace('\\u0026', '&')
+    if u.startswith('//'):
+        u = 'https:' + u
+    return u
+
+
 def extract_image_urls(page_html: str):
+    # WEBTOON marks actual reader-panel images with class `_images`. Restricting
+    # extraction to those nodes avoids accidentally collecting episode thumbnails.
+    tags = re.findall(r'<img\b[^>]*>', page_html, flags=re.I | re.S)
     candidates = []
-    patterns = [r'data-url=["\']([^"\']+)["\']', r'src=["\']([^"\']+)["\']']
-    for pat in patterns:
-        for raw in re.findall(pat, page_html, flags=re.I):
-            u = html.unescape(raw).replace('\\u0026', '&')
-            if u.startswith('//'):
-                u = 'https:' + u
-            if u.startswith('https://') and 'webtoon-phinf.pstatic.net' in urlparse(u).netloc:
+    for tag in tags:
+        if not re.search(r'class=["\'][^"\']*\b_images\b[^"\']*["\']', tag, flags=re.I):
+            continue
+        m = re.search(r'data-url=["\']([^"\']+)["\']', tag, flags=re.I)
+        if not m:
+            m = re.search(r'src=["\']([^"\']+)["\']', tag, flags=re.I)
+        if not m:
+            continue
+        u = normalize_url(m.group(1))
+        if u.startswith('https://') and 'webtoon-phinf.pstatic.net' in urlparse(u).netloc:
+            candidates.append(u)
+
+    # Fallback for markup variants: inspect the _imageList block only.
+    if not candidates:
+        block = re.search(r'id=["\']_imageList["\'][^>]*>(.*?)</div>\s*</div>', page_html, flags=re.I | re.S)
+        scoped = block.group(1) if block else ''
+        for raw in re.findall(r'(?:data-url|src)=["\']([^"\']+)["\']', scoped, flags=re.I):
+            u = normalize_url(raw)
+            if u.startswith('https://') and 'webtoon-phinf.pstatic.net' in urlparse(u).netloc and 'thumb_' not in u.lower():
                 candidates.append(u)
+
     out, seen = [], set()
     for u in candidates:
-        if u not in seen:
+        if u not in seen and 'thumb_' not in u.lower():
             seen.add(u)
             out.append(u)
     return out
@@ -103,7 +126,7 @@ def main():
     page = fetch(episode_url).decode('utf-8', errors='ignore')
     urls = extract_image_urls(page)
     if not urls:
-        raise SystemExit('No official episode images discovered')
+        raise SystemExit('No official episode-panel images discovered')
 
     count = min(int(req.get('max_images', 16)), MAX_IMAGES)
     start_frac = float(req.get('start_fraction', 0.0))
@@ -131,7 +154,7 @@ def main():
     manifest = {
         'source_id': req.get('source_id', req_path.stem),
         'episode_url': episode_url,
-        'discovered_image_count': len(urls),
+        'discovered_episode_panel_count': len(urls),
         'sample_window': [start_frac, end_frac],
         'selected': selected,
         'notice': 'Public official WEBTOON excerpts collected for transformative review/editing. This does not grant a license; final use remains subject to copyright/platform rules.'
