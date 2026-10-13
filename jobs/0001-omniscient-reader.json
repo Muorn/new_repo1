@@ -18,24 +18,17 @@
       "rights_basis": "official_promotional",
       "source_url": "https://www.youtube.com/watch?v=8eLxBdv5ThE",
       "source_note": "Official WEBTOON trailer thumbnail"
-    },
-    {
-      "id": "release-poster",
-      "url": "https://blog.kakaocdn.net/dna/bi3b4l/btqE7PE141L/AAAAAAAAAAAAAAAAAAAAANv4P0sS6cGLe51bIIUvKdV4xrpN4ZW1R_tZ4Mw61xKr/img.jpg?allow_ip=&allow_referer=&credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1774969199&signature=2i%2BGH6sCYWeB6kEOPOpzGhPpZDY%3D",
-      "rights_basis": "official_promotional",
-      "source_url": "https://ryuyuhyu.tistory.com/17",
-      "source_note": "Promotional release poster carrying WEBTOON branding"
     }
   ],
   "scenes": [
     {"asset_id": "trailer-2020", "duration": 4.2, "motion": "zoom_in", "caption": "IMAGINE FINISHING A WEB NOVEL..."},
-    {"asset_id": "release-poster", "duration": 4.1, "motion": "pan_right", "caption": "THEN THE STORY BECOMES REAL."},
-    {"asset_id": "trailer-2024", "duration": 4.1, "motion": "zoom_in", "caption": "MONSTERS. CHAOS. THE END OF THE WORLD."},
-    {"asset_id": "trailer-2020", "duration": 4.2, "motion": "pan_left", "caption": "AND ONLY ONE PERSON KNOWS WHAT COMES NEXT."},
-    {"asset_id": "release-poster", "duration": 4.0, "motion": "zoom_out", "caption": "KIM DOKJA KNOWS THE RULES."},
+    {"asset_id": "trailer-2024", "duration": 4.1, "motion": "pan_right", "caption": "THEN THE STORY BECOMES REAL."},
+    {"asset_id": "trailer-2020", "duration": 4.1, "motion": "zoom_out", "caption": "MONSTERS. CHAOS. THE END OF THE WORLD."},
+    {"asset_id": "trailer-2024", "duration": 4.2, "motion": "pan_left", "caption": "ONLY ONE PERSON KNOWS WHAT COMES NEXT."},
+    {"asset_id": "trailer-2020", "duration": 4.0, "motion": "zoom_in", "caption": "KIM DOKJA KNOWS THE RULES."},
     {"asset_id": "trailer-2024", "duration": 4.0, "motion": "pan_right", "caption": "HE KNOWS THE DISASTERS."},
-    {"asset_id": "trailer-2020", "duration": 4.0, "motion": "zoom_in", "caption": "HE EVEN KNOWS WHO SHOULD SURVIVE."},
-    {"asset_id": "release-poster", "duration": 4.4, "motion": "pan_left", "caption": "BUT CHANGING THE FUTURE CHANGES EVERYTHING."},
-    {"asset_id": "trailer-2024", "duration": 5.0, "motion": "zoom_in", "caption": "OMNISCIENT READER"}
+    {"asset_id": "trailer-2020", "duration": 4.0, "motion": "pan_left", "caption": "HE EVEN KNOWS WHO SHOULD SURVIVE."},
+    {"asset_id": "trailer-2024", "duration": 4.4, "motion": "zoom_out", "caption": "BUT CHANGING THE FUTURE CHANGES EVERYTHING."},
+    {"asset_id": "trailer-2020", "duration": 5.0, "motion": "zoom_in", "caption": "OMNISCIENT READER"}
   ]
 }
