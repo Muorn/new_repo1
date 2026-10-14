@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from PIL import Image, ImageStat
+
 W, H, FPS = 1080, 1920, 30
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 
@@ -27,9 +29,6 @@ def esc_filter_path(p: Path) -> str:
 
 
 def esc_drawtext(s: str) -> str:
-    # Avoid ASCII apostrophes inside FFmpeg's single-quoted drawtext value.
-    # A typographic apostrophe renders identically for our callouts but cannot
-    # terminate the filter expression.
     return (s.replace("'", "’")
              .replace('\\', '\\\\')
              .replace(':', '\\:')
@@ -44,6 +43,73 @@ def crop_filter(crop_box):
         f"crop=w='trunc(iw*{w:.6f}/2)*2':h='trunc(ih*{h:.6f}/2)*2':"
         f"x='iw*{x0:.6f}':y='ih*{y0:.6f}'"
     )
+
+
+def _blank_fraction(values, mode):
+    if not values:
+        return 0.0
+    if mode == 'dark':
+        return sum(v <= 14 for v in values) / len(values)
+    return sum(v >= 244 for v in values) / len(values)
+
+
+def tighten_crop_box(img_path: Path, crop_box):
+    """Trim only near-uniform black/white gutters from the OUTER edges of a requested crop.
+
+    This intentionally does not try to understand artwork. It only removes rows/columns
+    that are overwhelmingly blank so WEBTOON gutters do not become the visual subject.
+    """
+    try:
+        im = Image.open(img_path).convert('L')
+        iw, ih = im.size
+        x0, y0, x1, y1 = [float(v) for v in crop_box]
+        left, top = int(iw*x0), int(ih*y0)
+        right, bottom = max(left+2, int(iw*x1)), max(top+2, int(ih*y1))
+        region = im.crop((left, top, right, bottom))
+        # Keep detection cheap and robust.
+        region.thumbnail((500, 900))
+        rw, rh = region.size
+        px = region.load()
+
+        def row_blank(y):
+            vals = [px[x, y] for x in range(rw)]
+            return max(_blank_fraction(vals, 'dark'), _blank_fraction(vals, 'light')) >= 0.965
+
+        def col_blank(x):
+            vals = [px[x, y] for y in range(rh)]
+            return max(_blank_fraction(vals, 'dark'), _blank_fraction(vals, 'light')) >= 0.965
+
+        t, b, l, r = 0, rh-1, 0, rw-1
+        while t < rh-1 and row_blank(t):
+            t += 1
+        while b > t and row_blank(b):
+            b -= 1
+        while l < rw-1 and col_blank(l):
+            l += 1
+        while r > l and col_blank(r):
+            r -= 1
+
+        # Add a small breathing margin around detected content.
+        pad_x = max(2, int(rw * 0.025))
+        pad_y = max(2, int(rh * 0.025))
+        l, r = max(0, l-pad_x), min(rw-1, r+pad_x)
+        t, b = max(0, t-pad_y), min(rh-1, b+pad_y)
+
+        # Refuse pathological trims; semantic crop_box remains the main director.
+        keep_w = (r-l+1) / max(1, rw)
+        keep_h = (b-t+1) / max(1, rh)
+        if keep_w < 0.42 or keep_h < 0.28:
+            return crop_box
+
+        base_w, base_h = x1-x0, y1-y0
+        nx0 = x0 + base_w * (l / rw)
+        nx1 = x0 + base_w * ((r+1) / rw)
+        ny0 = y0 + base_h * (t / rh)
+        ny1 = y0 + base_h * ((b+1) / rh)
+        return [max(0,nx0), max(0,ny0), min(1,nx1), min(1,ny1)]
+    except Exception as e:
+        print(f'auto-trim skipped for {img_path}: {e}')
+        return crop_box
 
 
 def focus_expr(axis: str, focus: float) -> str:
@@ -113,7 +179,10 @@ def framed_filter(crop_box, motion: str, duration: float, fx: float, fy: float, 
 def render_scene(scene: dict, img: Path, out: Path, duration: float):
     motion = scene.get('motion', 'micro_zoom_in')
     layout = scene.get('layout', 'fill')
-    crop_box = scene.get('crop_box', [0, 0, 1, 1])
+    requested = scene.get('crop_box', [0, 0, 1, 1])
+    crop_box = tighten_crop_box(img, requested)
+    if crop_box != requested:
+        print(f'auto-trim {img.name}: {requested} -> {[round(v,4) for v in crop_box]}')
     fx = float(scene.get('focus_x', 0.5))
     fy = float(scene.get('focus_y', 0.5))
     emphasis = scene.get('emphasis', '')
@@ -135,6 +204,28 @@ def render_scene(scene: dict, img: Path, out: Path, duration: float):
     run(cmd)
 
 
+def timed_durations(scenes, narration_duration):
+    base = [float(s.get('duration', 2.6)) for s in scenes]
+    if not narration_duration:
+        return base
+
+    # Align the full visual story to the narration instead of letting -shortest
+    # chop off the intended final reveal. Preserve at least ~2.35s for a title reveal.
+    target_total = narration_duration + 0.35
+    if len(scenes) >= 2 and scenes[-1].get('story_role') == 'title_reveal':
+        final_d = min(max(base[-1], 2.35), max(2.35, target_total * 0.11))
+        prefix_base = sum(base[:-1])
+        prefix_target = max(0.1, target_total - final_d)
+        scale = prefix_target / prefix_base
+        durations = [d * scale for d in base[:-1]] + [final_d]
+        print(f'visual timing: prefix scale={scale:.3f}; title reveal={final_d:.2f}s; target={target_total:.2f}s')
+        return durations
+
+    scale = target_total / sum(base)
+    print(f'visual timing scale={scale:.3f}; target={target_total:.2f}s')
+    return [d * scale for d in base]
+
+
 def main():
     if len(sys.argv) != 2:
         raise SystemExit('Usage: render.py projects/<id>/project.json')
@@ -148,14 +239,7 @@ def main():
 
     narration = root / cfg.get('narration_file', 'narration.wav')
     narration_duration = probe_duration(narration) if narration.exists() else None
-    base_durations = [float(s.get('duration', 2.6)) for s in scenes]
-    base_total = sum(base_durations)
-
-    scale = 1.0
-    if narration_duration and base_total < narration_duration + 0.8:
-        scale = (narration_duration + 0.8) / base_total
-    durations = [d * scale for d in base_durations]
-    print(f'visual timing scale={scale:.3f}; base={base_total:.2f}s; narration={narration_duration or 0:.2f}s')
+    durations = timed_durations(scenes, narration_duration)
 
     work = root / '.render'
     outdir = root / 'output'
