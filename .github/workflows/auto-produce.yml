@@ -4,12 +4,15 @@ on:
   push:
     paths:
       - 'jobs/*.json'
+      - 'renderer/render.py'
+      - '.github/workflows/auto-produce.yml'
 
 permissions:
   contents: read
 
 env:
   PYTHON_VERSION: '3.11'
+  FALLBACK_JOB: 'jobs/001-omniscient-reader-v4b.json'
 
 jobs:
   produce:
@@ -28,12 +31,16 @@ jobs:
           set -euo pipefail
           BEFORE='${{ github.event.before }}'
           SHA='${{ github.sha }}'
+          JOB=''
           if [ "$BEFORE" = '0000000000000000000000000000000000000000' ]; then
-            JOB=$(git ls-tree -r --name-only "$SHA" | grep '^jobs/.*\.json$' | tail -n 1)
+            JOB=$(git ls-tree -r --name-only "$SHA" | grep '^jobs/.*\.json$' | tail -n 1 || true)
           else
-            JOB=$(git diff --name-only "$BEFORE" "$SHA" | grep '^jobs/.*\.json$' | tail -n 1)
+            JOB=$(git diff --name-only "$BEFORE" "$SHA" | grep '^jobs/.*\.json$' | tail -n 1 || true)
           fi
-          test -n "$JOB"
+          if [ -z "$JOB" ]; then
+            JOB="$FALLBACK_JOB"
+          fi
+          test -f "$JOB"
           echo "path=$JOB" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
@@ -46,7 +53,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
           python -m pip install --upgrade pip
-          python -m pip install kokoro-onnx soundfile
+          python -m pip install kokoro-onnx soundfile pillow
 
       - name: Materialize project and approved assets
         id: project
