@@ -27,9 +27,12 @@ def esc_filter_path(p: Path) -> str:
 
 
 def esc_drawtext(s: str) -> str:
-    return (s.replace('\\', '\\\\')
+    # Avoid ASCII apostrophes inside FFmpeg's single-quoted drawtext value.
+    # A typographic apostrophe renders identically for our callouts but cannot
+    # terminate the filter expression.
+    return (s.replace("'", "’")
+             .replace('\\', '\\\\')
              .replace(':', '\\:')
-             .replace("'", "\\'")
              .replace('%', '\\%'))
 
 
@@ -37,7 +40,6 @@ def crop_filter(crop_box):
     x0, y0, x1, y1 = [float(v) for v in crop_box]
     w = x1 - x0
     h = y1 - y0
-    # Force even dimensions for libx264/yuv420p compatibility.
     return (
         f"crop=w='trunc(iw*{w:.6f}/2)*2':h='trunc(ih*{h:.6f}/2)*2':"
         f"x='iw*{x0:.6f}':y='ih*{y0:.6f}'"
@@ -149,7 +151,6 @@ def main():
     base_durations = [float(s.get('duration', 2.6)) for s in scenes]
     base_total = sum(base_durations)
 
-    # Picture must outlive narration. Slow visuals rather than cutting off the final line.
     scale = 1.0
     if narration_duration and base_total < narration_duration + 0.8:
         scale = (narration_duration + 0.8) / base_total
