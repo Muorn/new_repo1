@@ -27,7 +27,7 @@ def download(url: str, dest: Path):
     parsed = urlparse(url)
     if parsed.scheme not in ALLOWED_SCHEMES:
         raise ValueError(f"Only HTTPS assets are permitted: {url}")
-    req = urllib.request.Request(url, headers={"User-Agent": "GPT-Manhwa-Shorts/3.0", "Referer": "https://www.webtoons.com/"})
+    req = urllib.request.Request(url, headers={"User-Agent": "GPT-Manhwa-Shorts/4.0", "Referer": "https://www.webtoons.com/"})
     with urllib.request.urlopen(req, timeout=30) as r:
         length = int(r.headers.get("Content-Length") or 0)
         if length and length > MAX_ASSET_BYTES:
@@ -43,6 +43,21 @@ def clamp01(value, default=0.5):
         return max(0.0, min(1.0, float(value)))
     except (TypeError, ValueError):
         return default
+
+
+def validate_crop_box(value, scene_no: int):
+    if not isinstance(value, list) or len(value) != 4:
+        raise SystemExit(f"Scene {scene_no} must include crop_box=[x0,y0,x1,y1] in V4")
+    try:
+        x0, y0, x1, y1 = [float(v) for v in value]
+    except (TypeError, ValueError):
+        raise SystemExit(f"Scene {scene_no} crop_box values must be numeric")
+    vals = [x0, y0, x1, y1]
+    if any(v < 0 or v > 1 for v in vals):
+        raise SystemExit(f"Scene {scene_no} crop_box must use normalized 0..1 coordinates")
+    if x1 - x0 < 0.12 or y1 - y0 < 0.12:
+        raise SystemExit(f"Scene {scene_no} crop_box is too small")
+    return [x0, y0, x1, y1]
 
 
 def main():
@@ -111,13 +126,20 @@ def main():
         layout = scene.get("layout", "fill")
         if layout not in ALLOWED_LAYOUTS:
             raise SystemExit(f"Scene {i} rejected: unsupported layout {layout!r}")
-        duration = float(scene.get("duration", 2.2))
+        duration = float(scene.get("duration", 2.6))
         if duration <= 0 or duration > 8:
             raise SystemExit(f"Scene {i} rejected: duration must be >0 and <=8s")
         fact = str(scene.get("fact", "")).strip()
         evidence_ref = str(scene.get("evidence_ref", "")).strip()
+        viewer_should_see = str(scene.get("viewer_should_see", "")).strip()
+        story_role = str(scene.get("story_role", "")).strip()
         if not fact or not evidence_ref:
-            raise SystemExit(f"Scene {i} must include fact and evidence_ref in V3")
+            raise SystemExit(f"Scene {i} must include fact and evidence_ref in V4")
+        if not viewer_should_see:
+            raise SystemExit(f"Scene {i} must state viewer_should_see in V4")
+        if not story_role:
+            raise SystemExit(f"Scene {i} must state story_role in V4")
+        crop_box = validate_crop_box(scene.get("crop_box"), i)
 
         scenes.append({
             "source": asset_map[asset_id],
@@ -125,9 +147,12 @@ def main():
             "duration": duration,
             "motion": motion,
             "layout": layout,
+            "crop_box": crop_box,
             "caption": scene.get("caption", ""),
             "fact": fact,
             "evidence_ref": evidence_ref,
+            "viewer_should_see": viewer_should_see,
+            "story_role": story_role,
             "focus_x": clamp01(scene.get("focus_x", 0.5)),
             "focus_y": clamp01(scene.get("focus_y", 0.5)),
             "emphasis": str(scene.get("emphasis", "")).strip()[:40],
@@ -137,10 +162,10 @@ def main():
 
     total = sum(s["duration"] for s in scenes)
     avg = total / len(scenes)
-    if total >= 30 and len(scenes) < 14:
-        raise SystemExit("V3 quality gate: >=30s videos require at least 14 visual beats")
-    if avg > 2.7:
-        raise SystemExit(f"V3 quality gate: average authored scene duration {avg:.2f}s exceeds 2.7s")
+    if total >= 35 and len(scenes) < 14:
+        raise SystemExit("V4 quality gate: >=35s videos require at least 14 meaningful visual beats")
+    if avg > 3.1:
+        raise SystemExit(f"V4 quality gate: average authored scene duration {avg:.2f}s exceeds 3.1s")
 
     project_json = {
         "video_id": video_id,
@@ -150,7 +175,9 @@ def main():
         "narration_file": "narration.wav",
         "subtitles_file": "subtitles.ass",
         "output_file": "final.mp4",
-        "renderer_version": 3,
+        "renderer_version": 4,
+        "tts_voice": job.get("tts_voice", "am_puck"),
+        "tts_speed": float(job.get("tts_speed", 1.0)),
         "scenes": scenes,
     }
     (project / "script.txt").write_text(job["script"].strip() + "\n", encoding="utf-8")
