@@ -33,6 +33,17 @@ def esc_drawtext(s: str) -> str:
              .replace('%', '\\%'))
 
 
+def crop_filter(crop_box):
+    x0, y0, x1, y1 = [float(v) for v in crop_box]
+    w = x1 - x0
+    h = y1 - y0
+    # Force even dimensions for libx264/yuv420p compatibility.
+    return (
+        f"crop=w='trunc(iw*{w:.6f}/2)*2':h='trunc(ih*{h:.6f}/2)*2':"
+        f"x='iw*{x0:.6f}':y='ih*{y0:.6f}'"
+    )
+
+
 def focus_expr(axis: str, focus: float) -> str:
     dim = 'iw' if axis == 'x' else 'ih'
     return f"max(0,min({dim}-{dim}/zoom,{dim}*{focus:.4f}-{dim}/(2*zoom)))"
@@ -46,15 +57,15 @@ def motion_filter(motion: str, duration: float, focus_x=0.5, focus_y=0.5) -> str
     y = focus_expr('y', focus_y)
 
     if motion == 'micro_zoom_in':
-        return fill + f",zoompan=z='min(zoom+0.0008,1.07)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(zoom+0.0007,1.06)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'micro_zoom_out':
-        return fill + f",zoompan=z='if(eq(on,1),1.07,max(zoom-0.0008,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='if(eq(on,1),1.06,max(zoom-0.0007,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'zoom_in':
-        return fill + f",zoompan=z='min(zoom+0.0016,1.13)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(zoom+0.0013,1.11)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'zoom_out':
-        return fill + f",zoompan=z='if(eq(on,1),1.13,max(zoom-0.0016,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='if(eq(on,1),1.11,max(zoom-0.0013,1.0))':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'punch_in':
-        return fill + f",zoompan=z='min(1+on/{max(frames,1)}*0.16,1.16)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
+        return fill + f",zoompan=z='min(1+on/{max(frames,1)}*0.13,1.13)':x='{x}':y='{y}':d={frames}:s={W}x{H}:fps={FPS}"
     if motion == 'pan_left':
         return large + ",crop=1080:1920:x='max(0,(iw-1080)*(1-t/{d}))':y='max(0,(ih-1920)*{fy})',fps={fps}".format(d=max(duration,.001), fy=focus_y, fps=FPS)
     if motion == 'pan_right':
@@ -64,7 +75,7 @@ def motion_filter(motion: str, duration: float, focus_x=0.5, focus_y=0.5) -> str
     if motion == 'pan_down':
         return large + ",crop=1080:1920:x='max(0,(iw-1080)*{fx})':y='min(ih-1920,(ih-1920)*(t/{d}))',fps={fps}".format(d=max(duration,.001), fx=focus_x, fps=FPS)
     if motion == 'shake':
-        return large + ",crop=1080:1920:x='(iw-1080)/2+10*sin(45*t)':y='(ih-1920)/2+8*cos(41*t)',fps={fps}".format(fps=FPS)
+        return large + ",crop=1080:1920:x='(iw-1080)/2+9*sin(43*t)':y='(ih-1920)/2+7*cos(39*t)',fps={fps}".format(fps=FPS)
     return fill + f",fps={FPS}"
 
 
@@ -72,21 +83,23 @@ def emphasis_filter(text: str, impact: bool) -> str:
     if not text:
         return ''
     safe = esc_drawtext(text.upper())
-    fontsize = 60 if len(text) <= 18 else 48
-    alpha = "if(lt(t,0.10),t/0.10,if(lt(t,1.0),1,if(lt(t,1.25),(1.25-t)/0.25,0)))"
+    fontsize = 58 if len(text) <= 18 else 46
+    alpha = "if(lt(t,0.10),t/0.10,if(lt(t,1.05),1,if(lt(t,1.30),(1.30-t)/0.25,0)))"
     box = "box=1:boxcolor=black@0.48:boxborderw=18"
     draw = (
         f"drawtext=fontfile='{FONT}':text='{safe}':fontsize={fontsize}:fontcolor=white:"
-        f"borderw=4:bordercolor=black@0.9:{box}:x=(w-text_w)/2:y=170:alpha='{alpha}'"
+        f"borderw=4:bordercolor=black@0.9:{box}:x=(w-text_w)/2:y=155:alpha='{alpha}'"
     )
     if impact:
         draw += ",eq=contrast=1.05:saturation=1.06"
     return ',' + draw
 
 
-def framed_filter(motion: str, duration: float, fx: float, fy: float, emphasis: str, impact: bool) -> str:
+def framed_filter(crop_box, motion: str, duration: float, fx: float, fy: float, emphasis: str, impact: bool) -> str:
+    crop = crop_filter(crop_box)
     pre = (
-        "split=2[bg][fg];"
+        f"[0:v]{crop}[src];"
+        "[src]split=2[bg][fg];"
         "[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=24[bg2];"
         "[fg]scale=1040:1820:force_original_aspect_ratio=decrease[fg2];"
         "[bg2][fg2]overlay=(W-w)/2:(H-h)/2[comp];"
@@ -98,6 +111,7 @@ def framed_filter(motion: str, duration: float, fx: float, fy: float, emphasis: 
 def render_scene(scene: dict, img: Path, out: Path, duration: float):
     motion = scene.get('motion', 'micro_zoom_in')
     layout = scene.get('layout', 'fill')
+    crop_box = scene.get('crop_box', [0, 0, 1, 1])
     fx = float(scene.get('focus_x', 0.5))
     fy = float(scene.get('focus_y', 0.5))
     emphasis = scene.get('emphasis', '')
@@ -105,10 +119,10 @@ def render_scene(scene: dict, img: Path, out: Path, duration: float):
 
     cmd = ['ffmpeg', '-y', '-loop', '1', '-i', str(img), '-t', f'{duration:.3f}']
     if layout == 'framed':
-        fc = framed_filter(motion, duration, fx, fy, emphasis, impact)
+        fc = framed_filter(crop_box, motion, duration, fx, fy, emphasis, impact)
         cmd += ['-filter_complex', fc, '-map', '[v]']
     else:
-        vf = motion_filter(motion, duration, fx, fy) + emphasis_filter(emphasis, impact)
+        vf = crop_filter(crop_box) + ',' + motion_filter(motion, duration, fx, fy) + emphasis_filter(emphasis, impact)
         cmd += ['-vf', vf]
 
     cmd += [
@@ -132,14 +146,13 @@ def main():
 
     narration = root / cfg.get('narration_file', 'narration.wav')
     narration_duration = probe_duration(narration) if narration.exists() else None
-    base_durations = [float(s.get('duration', 2.2)) for s in scenes]
+    base_durations = [float(s.get('duration', 2.6)) for s in scenes]
     base_total = sum(base_durations)
 
-    # Never allow the picture track to end before the narration. If narration is
-    # longer than the authored scene plan, slow the visual cadence proportionally.
+    # Picture must outlive narration. Slow visuals rather than cutting off the final line.
     scale = 1.0
-    if narration_duration and base_total < narration_duration + 0.35:
-        scale = (narration_duration + 0.35) / base_total
+    if narration_duration and base_total < narration_duration + 0.8:
+        scale = (narration_duration + 0.8) / base_total
     durations = [d * scale for d in base_durations]
     print(f'visual timing scale={scale:.3f}; base={base_total:.2f}s; narration={narration_duration or 0:.2f}s')
 
@@ -155,6 +168,7 @@ def main():
         if not src.exists():
             raise FileNotFoundError(src)
         clip = work / f'{i:03d}.mp4'
+        print(f"scene {i:02d}: {scene.get('story_role')} | viewer sees: {scene.get('viewer_should_see')}")
         render_scene(scene, src, clip, duration)
         clips.append(clip)
 
